@@ -1,0 +1,3 @@
+
+- However, you must step onto the X, by moving vertically forward. You CAN NOT take a diagonal angle to land on the X.
+- they cannot move to the left
