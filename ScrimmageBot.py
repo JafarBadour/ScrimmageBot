@@ -9,44 +9,52 @@ dy = [1, -1, -1, 1, 0, 0]  # cols / reels # these are all possible moves regardl
 
 class State:
     def __init__(self, another_state=None):
-        op, ol, mp, dt, mlv = [], (), [], False, ()
+        op, ol, mp, dt, mlv, bc = [], (), [], False, (), 'white'
         if another_state:
             op = another_state.opponent_pieces
             ol = another_state.opponent_last_move
             mp = another_state.my_pieces
             dt = another_state.displacement_transition
             mlv = another_state.my_last_move
+            bc = another_state.bot_col
         self.opponent_pieces = op
         self.opponent_last_move = ol
         self.my_pieces = mp
         self.displacement_transition = dt
-        self.grid = self.make_grid()
         self.my_last_move = mlv
+        self.bot_col = bc
+        self.grid = self.make_grid()
 
     def make_grid(self):
         grid = [['.'] * 7 for i in range(14)]
-
+        colbot, colopp = 'O', 'D'
+        if self.bot_col == 'black':
+            colbot, colopp = 'D', 'O'
         grid[0][3] = 'X'
         grid[13][3] = 'X'
         for p in self.my_pieces:
             x, y = p
-            grid[x][y] = 'O'
+            grid[x][y] = colbot
 
         for p in self.opponent_pieces:
             x, y = p
-            grid[x][y] = 'D'
+            grid[x][y] = colopp
 
         return grid
 
     def is_piece(self, opponent_to, pieces):
         return any(piece == opponent_to for piece in pieces)
 
-    def set_state(self, json_data: dict):
+    def set_state(self, json_data: dict, bot_col: str):
         original_panel = json_data['originalPanel']
         new_panel = json_data['newPanel']
         # print(json_data.keys())
-        self.my_pieces = list(sorted(original_panel['my_pieces']))
-        self.opponent_pieces = list(sorted(original_panel['opponents_pieces']))
+        a, b = ('black', 'white')
+        if bot_col != a:
+            a, b = b, a
+        self.bot_col = bot_col
+        self.my_pieces = list(sorted(original_panel[a]))
+        self.opponent_pieces = list(sorted(original_panel[b]))
         if 'transition' in json_data.keys():
             transition = json_data['transition']
             move_from, move_to = (transition['from']['row'], transition['from']['reel']), \
@@ -54,11 +62,9 @@ class State:
             self.opponent_last_move = (move_from, move_to)
             self.displacement_transition = self.is_piece(move_to, self.my_pieces)
 
-
-
         # Setting new state
-        self.my_pieces = list(sorted(new_panel['my_pieces']))
-        self.opponent_pieces = list(sorted(new_panel['opponents_pieces']))
+        self.my_pieces = list(sorted(new_panel[a]))
+        self.opponent_pieces = list(sorted(new_panel[b]))
         self.my_last_move = ()
         return self
 
@@ -71,15 +77,18 @@ class State:
         n, m = len(grid), len(grid[0])
         # print(n,m)
         op, ol, mp, dt = [], (), [], False
+        colbot, colopp = 'O', 'D'
+        if self.bot_col == 'black':
+            colbot, colopp = colopp, colbot
         for i in range(n):
             for j in range(m):
                 try:
                     c = grid[i][j]
                 except:
                     print(i, j, 'Err')
-                if c == 'O':
+                if c == colbot:
                     mp.append((i, j))
-                if c == 'D':
+                if c == colopp:
                     op.append((i, j))
         self.opponent_pieces = list(sorted(op))
         self.my_pieces = list(sorted(mp))
@@ -93,7 +102,7 @@ class State:
         sx, sy = nx + dxx, ny + dyy  # second piece
 
         if grid[nx][ny] != '.':
-            if not (nx == 0 and ny == 3): # last edit
+            if not (nx == 0 and ny == 3):  # last edit
                 grid[sx][sy] = grid[nx][ny]
             dt = True
 
@@ -106,6 +115,43 @@ class State:
 
     def grid_to_str(self, grid):
         return '\n'.join([''.join(x) for x in grid])
+
+    def show_grid(self, grid):
+        imp_grid = grid
+        for i in range(len(imp_grid)):
+            space = ' '
+            if i>= 10:
+                space = ''
+            imp_grid[i] = str(i) + space + ''.join(imp_grid[i])
+
+        res = '\n'.join([''.join(x) for x in reversed(imp_grid)])
+        res = res + '\n  0123456'
+        return res
+
+
+    def json_response(self):
+        white, black = self.my_pieces, self.opponent_pieces
+        if self.bot_col == 'black':
+            black, white = white, black
+        return {
+            'black': black,
+            'white': white
+        }
+
+    def transition_json(self):
+        if not self.my_last_move:
+            return {}
+        (xf, yf), (xt, yt) = self.my_last_move
+        return {
+            'from': {
+                'reel': yf,
+                'row': xf
+            },
+            'to': {
+                'reel': yt,
+                'row': xt
+            }
+        }
 
 
 class ScrimmageBot:
@@ -152,7 +198,7 @@ class ScrimmageBot:
         #     print(score, ' SCORE')
         #     print(boards[i].grid_to_str(boards[i].make_grid()))
         optimal_score, optimal_index = sorted_scoreboard[0]
-        print(f'Move with score {optimal_score} play a move --->')
+        print(f'Move with score {optimal_score} play a move --->{available_moves[0]}')
         return State(current_state).make_move(available_moves[0])
 
     def finish_line(self, state: State):
@@ -175,9 +221,13 @@ class ScrimmageBot:
         rweights = weights[::-1]
         n, m = len(grid), len(grid[0])
         score = 0
+        colbot, colopp = 'O', 'D'
+        if state.bot_col == 'black':
+            weights, rweights = rweights, weights
+            colbot, colopp = colopp, colbot
         for i in range(n):
             for j in range(m):
-                if grid[i][j] == 'O':
+                if grid[i][j] == colbot:
                     score += weights[i][j]
                 elif grid[i][j] == 'D':
                     score -= rweights[i][j]
@@ -214,7 +264,12 @@ class ScrimmageBot:
             return abs(dxx) + abs(dyy) == 1
         if self.on_borders(to_x, to_y):
             return False
-        if grid[from_x][from_y] != 'O':
+
+        colbot, colopp = 'O', 'D'
+        if original_state.bot_col == 'black':
+            colbot, colopp = colopp, colbot
+
+        if grid[from_x][from_y] != colbot:
             return False
 
         to_C = grid[to_x][to_y]
@@ -244,17 +299,17 @@ if __name__ == '__main__':
     scrimmage_bot.loads_database('database.db')
     state = {
         'originalPanel': {
-            'my_pieces': [(6, 2), (6, 3), (6, 4)],
-            'opponents_pieces': [(7, 2), (7, 3), (7, 4)]
+            'white': [(6, 2), (6, 3), (6, 4)],
+            'black': [(7, 2), (7, 3), (7, 4)]
         },
         'newPanel': {
-            'my_pieces': [(6, 2), (5, 2), (6, 4)],
-            'opponents_pieces': [(7, 2), (7, 3), (6, 3)]
+            'white': [(6, 2), (5, 2), (6, 4)],
+            'black': [(7, 2), (7, 3), (6, 3)]
         },
         'transition': {
             'from': {'reel': 4, 'row': 7},
             'to': {'reel': 3, 'row': 6}
         }
     }
-    state = State().set_state(state)
+    state = State().set_state(state, 'white')
     scrimmage_bot.is_valid_move(((6, 2), (7, 3)), state)
