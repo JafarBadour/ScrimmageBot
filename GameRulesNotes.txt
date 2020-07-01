@@ -1,3 +1,33 @@
 
 - However, you must step onto the X, by moving vertically forward. You CAN NOT take a diagonal angle to land on the X.
 - they cannot move to the left
+
+
+{
+	1. Offensive Guards and Defensive Tackles displace 'opponents' on
+
+		their diagonal corners.
+
+
+	2. Offensive Guards and Defensive Tackles can also displace their
+		'own pieces' from their diagonal corners.
+
+	3. Once an Offensive Guard or a Defensive Tackle is isolated from all
+		other pieces, then it becomes unable to move diagonally at all.
+	 
+	4. Offensive Guards and Defensive Tackles can displace their own
+		pieces forwards and backwards vertically.
+
+	5. Offensive Guards and Defensive Tackles can not displace opponents
+		pieces forwards and backwards vertically, as they do not have
+		Power Squares in these vertical positions.
+}
+
+- Once a piece has been displaced out-of-bounds, it 'cannot move'. It relies
+on a piece to land on one of its corner diagonal squares that are on the 
+on their diagonal corners. The only piece that has both diagonal and
+vertical and horizontal Power Squares it the Offensive Tackle, making
+It matters where these Power Squares are positioned to be able to affect
+a Power displacement. All pieces that have Power Squares have them
+OG
+active Grid to activate its Power Square - enabling it to re-enter the game.

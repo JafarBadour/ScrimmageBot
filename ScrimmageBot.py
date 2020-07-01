@@ -57,10 +57,14 @@ class State:
         self.opponent_pieces = list(sorted(original_panel[b]))
         if 'transition' in json_data.keys():
             transition = json_data['transition']
-            move_from, move_to = (transition['from']['row'], transition['from']['reel']), \
-                                 (transition['to']['row'], transition['to']['reel'])
-            self.opponent_last_move = (move_from, move_to)
-            self.displacement_transition = self.is_piece(move_to, self.my_pieces)
+            if 'from' in transition.keys():
+                move_from, move_to = (transition['from']['row'], transition['from']['reel']), \
+                                     (transition['to']['row'], transition['to']['reel'])
+                self.opponent_last_move = (move_from, move_to)
+                self.displacement_transition = self.is_piece(move_to, self.my_pieces)
+            else:
+                self.opponent_last_move = ((-3, -3), (-4, -3))  # dummy positions that wont be considered
+                self.displacement_transition = False
 
         # Setting new state
         self.my_pieces = list(sorted(new_panel[a]))
@@ -101,9 +105,9 @@ class State:
         dxx, dyy = nx - px, ny - py
         sx, sy = nx + dxx, ny + dyy  # second piece
 
-        if grid[nx][ny] != '.':
-            if not (nx == 0 and ny == 3):  # last edit
-                grid[sx][sy] = grid[nx][ny]
+        if grid[nx][ny] != '.' and grid[nx][ny] != 'X':
+            # if not (nx == 0 and ny == 3):  # last edit
+            grid[sx][sy] = grid[nx][ny]
             dt = True
 
         grid[nx][ny] = grid[px][py]
@@ -120,14 +124,13 @@ class State:
         imp_grid = grid
         for i in range(len(imp_grid)):
             space = ' '
-            if i>= 10:
+            if i >= 10:
                 space = ''
             imp_grid[i] = str(i) + space + ''.join(imp_grid[i])
 
         res = '\n'.join([''.join(x) for x in reversed(imp_grid)])
         res = res + '\n  0123456'
         return res
-
 
     def json_response(self):
         white, black = self.my_pieces, self.opponent_pieces
@@ -153,12 +156,19 @@ class State:
             }
         }
 
+    def alter_turn(self, last_move):
+        self.my_pieces, self.opponent_pieces = self.opponent_pieces, self.my_pieces
+        self.opponent_last_move = last_move
+        # TODO
+        return self
+
 
 class ScrimmageBot:
-    def __init__(self):
+    def __init__(self, bot_col: str):
         self.model_weights = []
         self.state_logs = []
-        self.my_finish_cell = (13, 3)
+        self.my_finish_cell = (13, 3) if bot_col == 'white' else (0, 3)
+        self.bot_col = bot_col
 
     def loads_database(self, file_path: str):
         self.model_weights = np.loadtxt(file_path)
@@ -174,7 +184,8 @@ class ScrimmageBot:
                 available_moves.append((p, (nx, ny)))
         return available_moves
 
-    def random_move(self, current_state):
+    def random_move(self, json_state):
+        current_state = State().set_state(json_state, self.bot_col)
         original_state = State(current_state)
         if self.finish_line(original_state):
             return 'Done'
@@ -183,9 +194,11 @@ class ScrimmageBot:
 
         r = random.randint(0, len(available_moves))
         print('Move taken by bot is :', available_moves[r])
-        return State(current_state).make_move(available_moves[r])
+        return State(current_state).make_move(available_moves[r])  # .alter_turn(available_moves[r])
 
-    def optimal_move_draft(self, current_state):
+    def optimal_move_draft(self, json_state):
+        current_state = State().set_state(json_state, self.bot_col)
+        print('state dt', current_state.displacement_transition)
         original_state = State(current_state)
         if self.finish_line(original_state):
             return 'Done'
@@ -198,12 +211,18 @@ class ScrimmageBot:
         #     print(score, ' SCORE')
         #     print(boards[i].grid_to_str(boards[i].make_grid()))
         optimal_score, optimal_index = sorted_scoreboard[0]
-        print(f'Move with score {optimal_score} play a move --->{available_moves[0]}')
-        return State(current_state).make_move(available_moves[0])
+        optimal_move = available_moves[optimal_index]
+        print(f'Move with score {optimal_score} : Col {self.bot_col} :play a move --->{optimal_move}')
+        state = State(current_state).make_move(optimal_move)
+        return state
 
     def finish_line(self, state: State):
         _, op, _, _ = state.unpack()
         return any(piece == self.my_finish_cell for piece in op)
+
+    def is_winner(self, state : State):
+        mp,_,_,_ = state.unpack()
+        return any(piece == (0,3) or piece == (13,3) for piece in mp)
 
     def process_next_transition(self, depth_minimax):
         pass
@@ -217,32 +236,34 @@ class ScrimmageBot:
     def score_state(self, state: State):
         grid = state.make_grid()
 
-        weights = self.model_weights
-        rweights = weights[::-1]
+        rweights = self.model_weights
+        weights = rweights[::-1]
         n, m = len(grid), len(grid[0])
         score = 0
         colbot, colopp = 'O', 'D'
-        if state.bot_col == 'black':
+        if self.bot_col == 'black':
             weights, rweights = rweights, weights
             colbot, colopp = colopp, colbot
         for i in range(n):
             for j in range(m):
                 if grid[i][j] == colbot:
                     score += weights[i][j]
-                elif grid[i][j] == 'D':
+                elif grid[i][j] == colopp:
                     score -= rweights[i][j]
 
         for a in state.my_pieces:
             for b in state.my_pieces:
                 ax, ay = a
                 bx, by = b
-                score -= (ax - bx) ** 2 + (ay - by) ** 2
+                score -= 0 * max(abs(ax - bx), abs(ay - by))  # ** 2
+                # TODO
 
         for a in state.opponent_pieces:
             for b in state.opponent_pieces:
                 ax, ay = a
                 bx, by = b
-                score += (ax - bx) ** 2 + (ay - by) ** 2
+                score += 0 * max(abs(ax - bx), abs(ay - by))  # ** 2
+                # TODO
         return score
 
     def is_valid_move(self, move, original_state):
@@ -254,8 +275,9 @@ class ScrimmageBot:
         dxx = to_x - from_x
         dyy = to_y - from_y
         nx, ny = dxx + to_x, dyy + to_y
-
-        if not self.in_bounds(nx, ny):
+        if abs(dxx) + abs(dyy) > 2 or abs(dxx) + abs(dyy) < 1:
+            return False
+        if not self.in_bounds(to_x, to_y):
             return False
         if abs(dyy) == 1 and dxx == 0:
             return False
