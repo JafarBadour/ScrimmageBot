@@ -318,15 +318,19 @@ class ScrimmageBot:
         if original_state.displacement_transition:
             opl = original_state.opponent_last_move
             (ofx, ofy), (otx, oty) = opl
-            dxx = otx - ofx
-            dyy = oty - ofy
-            sx = otx + dxx
-            sy = oty + dyy
+            fdxx = otx - ofx
+            fdyy = oty - ofy
+            sx = otx + fdxx
+            sy = oty + fdyy
             # print(sx, sy, otx, oty)
             if move == ((sx, sy), (otx, oty)):
                 return False
         if self.on_borders(from_x, from_y) and abs(dxx) + abs(dyy) == 1:
             return False
+        # if from_x == 0 and from_y == 4:
+        #     print(f'ENDING {self.on_borders(from_x, from_y)}')
+        #     print(abs(dxx) + abs(dyy) )
+        # print(f'{self.on_borders(to_x, to_y)} on_borders', abs(dxx) + abs(dyy))
         return True
         # TO BE DONE
 
