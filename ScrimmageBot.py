@@ -6,6 +6,8 @@ dy = [1, -1, -1, 1, 0, 0]  # cols / reels # these are all possible moves regardl
 
 
 # regardless of constraints
+def convert_to_tuple(move):
+    return (move[0], move[1])
 
 class State:
     def __init__(self, another_state=None):
@@ -53,8 +55,9 @@ class State:
         if bot_col != a:
             a, b = b, a
         self.bot_col = bot_col
-        self.my_pieces = list(sorted(original_panel[a]))
-        self.opponent_pieces = list(sorted(original_panel[b]))
+        self.my_pieces = list(sorted(map(convert_to_tuple,original_panel[a])))
+
+        self.opponent_pieces = list(sorted(map(convert_to_tuple,original_panel[b])))
         if 'transition' in json_data.keys():
             transition = json_data['transition']
             if 'from' in transition.keys():
@@ -70,6 +73,9 @@ class State:
         self.my_pieces = list(sorted(new_panel[a]))
         self.opponent_pieces = list(sorted(new_panel[b]))
         self.my_last_move = ()
+        # original_state = State().set_state(original_panel)
+        # self.displacement_transition = original_panel.check_displacement(original_state, )
+
         return self
 
     def unpack(self):
@@ -162,6 +168,13 @@ class State:
         # TODO
         return self
 
+    def check_displacement(self, old_state, transition: tuple):
+        (x1, y1), (x2, y2) = transition
+        total_pieces = old_state.my_pieces + old_state.opponent_pieces
+        if old_state.is_piece((x1, y1), pieces=total_pieces) and old_state.is_piece((x2, y2), total_pieces):
+            return True
+        return False
+
 
 class ScrimmageBot:
     def __init__(self, bot_col: str):
@@ -220,9 +233,9 @@ class ScrimmageBot:
         _, op, _, _ = state.unpack()
         return any(piece == self.my_finish_cell for piece in op)
 
-    def is_winner(self, state : State):
-        mp,_,_,_ = state.unpack()
-        return any(piece == (0,3) or piece == (13,3) for piece in mp)
+    def is_winner(self, state: State):
+        mp, _, _, _ = state.unpack()
+        return any(piece == (0, 3) or piece == (13, 3) for piece in mp)
 
     def process_next_transition(self, depth_minimax):
         pass
@@ -282,10 +295,11 @@ class ScrimmageBot:
         if abs(dyy) == 1 and dxx == 0:
             return False
         grid = original_state.make_grid()
-        if grid[to_x][to_y] == 'X':
+        if grid[to_x][to_y] == 'X' and not self.on_borders(from_x, from_y):
             return abs(dxx) + abs(dyy) == 1
         if self.on_borders(to_x, to_y):
             return False
+
 
         colbot, colopp = 'O', 'D'
         if original_state.bot_col == 'black':
@@ -297,6 +311,7 @@ class ScrimmageBot:
         to_C = grid[to_x][to_y]
         if to_C != '.' and (grid[nx][ny] != '.' or abs(dxx) + abs(dyy) == 1):
             return False
+
         if abs(dxx) + abs(dyy) == 2 and grid[to_x][to_y] == '.':
             return False
 
@@ -310,7 +325,8 @@ class ScrimmageBot:
             # print(sx, sy, otx, oty)
             if move == ((sx, sy), (otx, oty)):
                 return False
-
+        if self.on_borders(from_x, from_y) and abs(dxx) + abs(dyy) == 1:
+            return False
         return True
         # TO BE DONE
 
@@ -328,10 +344,10 @@ if __name__ == '__main__':
             'white': [(6, 2), (5, 2), (6, 4)],
             'black': [(7, 2), (7, 3), (6, 3)]
         },
-        'transition': {
+        'transition': [{},{
             'from': {'reel': 4, 'row': 7},
             'to': {'reel': 3, 'row': 6}
-        }
+        }]
     }
     state = State().set_state(state, 'white')
     scrimmage_bot.is_valid_move(((6, 2), (7, 3)), state)

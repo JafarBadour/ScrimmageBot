@@ -41,15 +41,6 @@ def read_gridfromfile(filepath):
 
 class TestSum(unittest.TestCase):
 
-    def test_make_grid(self):
-        state = state1
-        state = State().set_state(state,'white')
-        grid = state.make_grid()
-        # print(grid)
-        grid = state.grid_to_str(grid)
-        supposed_to_be = ''.join(read_gridfromfile('starting_move1.txt'))
-
-        self.assertEqual(grid, supposed_to_be, "grids are not equal test_make_grid")
 
     def test_is_piece(self):
         state = State().set_state(state1,'white')
@@ -64,6 +55,7 @@ class TestSum(unittest.TestCase):
         move = (transition['from']['row'], transition['from']['reel']), (
             transition['to']['row'], transition['to']['reel'])
         self.assertEqual(ol, move, "test_un_pack ol != move")
+
 
     def test_grid_transpose(self):
         state = State().set_state(state1,'white')
@@ -82,7 +74,7 @@ class TestSum(unittest.TestCase):
                          ''.join(read_gridfromfile('gridmove2.txt')), " test_make_move")
 
     def test_bot_is_valid(self):
-        bot = ScrimmageBot()
+        bot = ScrimmageBot('white')
         bot.loads_database('database.db')
         state = State().set_state(state1,'white')
 
@@ -118,7 +110,7 @@ class TestSum(unittest.TestCase):
         # print(grid)
         state = State().grid_transpose(grid)
         # print(state.my_pieces, state.opponent_last_move, state.opponent_pieces)
-        bot = ScrimmageBot()
+        bot = ScrimmageBot('white')
         rejected_moves = []
         for ddx, ddy in zip(dx,dy):
             rejected_moves.append(((0,0),(ddx, ddy)))
@@ -130,10 +122,9 @@ class TestSum(unittest.TestCase):
 
 
     def test_make_random_move_bot(self):
-        bot = ScrimmageBot()
+        bot = ScrimmageBot('white')
         bot.loads_database('database.db')
-        state = State().set_state(state1,'white')
-        print(bot.optimal_move_draft(state))
+        print(bot.optimal_move_draft(state1))
 
 
     # def test_make_move_start(self):
